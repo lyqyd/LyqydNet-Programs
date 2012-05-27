@@ -1,0 +1,224 @@
+local tArgs = {...}
+local connectedUsers = {}
+
+local function chatread( _sReplaceChar, _tHistory )	
+	term.setCursorBlink( true )
+
+	local sLine = ""
+	local nHistoryPos = nil
+	local nPos = 0
+	if _sReplaceChar then
+		_sReplaceChar = string.sub( _sReplaceChar, 1, 1 )
+	end
+	
+	local foo = 0
+	local w, h = term.getSize()
+	local sx, sy = term.getCursorPos()	
+	local function redraw()
+		local nScroll = 0
+		if sx + nPos >= w then
+			nScroll = (sx + nPos) - w
+		end
+			
+		term.setCursorPos( sx, sy )
+		term.write( string.rep(" ", w - sx + 1) )
+		term.setCursorPos( sx, sy )
+		if _sReplaceChar then
+			term.write( string.rep(_sReplaceChar, string.len(sLine) - nScroll) )
+		else
+			term.write( string.sub( sLine, nScroll + 1 ) )
+		end
+		term.setCursorPos( sx + nPos - nScroll, sy )
+	end
+	
+	while true do
+		local sEvent, param, param2, param3 = os.pullEvent()
+		if sEvent == "char" then
+			sLine = string.sub( sLine, 1, nPos ) .. param .. string.sub( sLine, nPos + 1 )
+			nPos = nPos + 1
+			redraw()
+			
+		elseif sEvent == "key" then
+			if param == 28 then
+				-- Enter
+				break
+				
+			elseif param == 203 then
+				-- Left
+				if nPos > 0 then
+					nPos = nPos - 1
+					redraw()
+				end
+				
+			elseif param == 205 then
+				-- Right				
+				if nPos < string.len(sLine) then
+					nPos = nPos + 1
+					redraw()
+				end
+			
+			elseif param == 200 or param == 208 then
+				-- Up or down
+				if _tHistory then
+					if param == 200 then
+						-- Up
+						if nHistoryPos == nil then
+							if #_tHistory > 0 then
+								nHistoryPos = #_tHistory
+							end
+						elseif nHistoryPos > 1 then
+							nHistoryPos = nHistoryPos - 1
+						end
+					else
+						-- Down
+						if nHistoryPos == #_tHistory then
+							nHistoryPos = nil
+						elseif nHistoryPos ~= nil then
+							nHistoryPos = nHistoryPos + 1
+						end						
+					end
+					
+					if nHistoryPos then
+						sLine = _tHistory[nHistoryPos]
+						nPos = string.len( sLine ) 
+					else
+						sLine = ""
+						nPos = 0
+					end
+					redraw()
+				end
+			elseif param == 14 then
+				-- Backspace
+				if nPos > 0 then
+					sLine = string.sub( sLine, 1, nPos - 1 ) .. string.sub( sLine, nPos + 1 )
+					nPos = nPos - 1					
+					redraw()
+				end
+			elseif param == 199 then
+				--home
+				if nPos > 0 then
+					nPos = 0
+					redraw()
+				end					   
+			elseif param == 207 then
+				--end							   
+				if nPos < string.len(sLine) then
+					nPos = string.len(sLine)
+					redraw()
+				end
+			elseif param == 211 then
+				--delete
+				if nPos >= 0 and nPos < string.len(sLine) then
+					if nPos == 0 then
+						sLine = string.sub( sLine, 2)
+					else
+						sLine = string.sub( sLine, 1, nPos ) .. string.sub( sLine, nPos + 2 )
+					end
+					redraw()
+				end
+			end
+		elseif sEvent == "rednet_message" then
+			routeNum, pType, packetData = net.rednet_message(param, param2, param3)
+			if routeNum then
+				if connection.route(serverConnection) == routeNum then
+					processResponse(pType, packetData)
+				end 
+			end
+
+			foo, sy = term.getCursorPos()
+			if shell.getRunningProgram() == nil then
+				term.setCursorPos(1, sy)
+				term.write(shell.dir().."> ")
+				term.setCursorPos(foo, sy)
+			end
+			redraw()
+		end
+	end
+	
+	term.setCursorBlink( false )
+	term.setCursorPos( w + 1, sy )
+	print()
+	
+	return sLine
+end
+
+local function processResponse(pType, message)
+	if pType == "SC" then
+		net.localprint("Connection closed by server.")
+	elseif pType == "SP" then
+		if string.sub(message, 1, 2) == "p;" then
+			message = string.match(message, ";(.*)")
+			if message ~= "\n" then net.localprint(message) end
+		elseif string.sub(message, 1, 2) == "c;" then
+			message = string.sub(message, 3)
+			local commandReceived = string.match(message, "^(%w+),?")
+			if commandReceived == "kicked" or commandReceived == "banned" or commandReceived == "disconnected" then
+				local userName = string.match(message, ",(%w+)")
+				for uNum, uInfo in ipairs(connectedUsers) do
+					if uInfo.name = userName then
+						table.remove(connectedUsers, uNum)
+						break
+					end
+				end
+				if commandReceived == "kicked" then
+					net.localprint("User "..userName.." was kicked.")
+				elseif commandReceived == "banned" then
+					net.localprint("User "..userName.." was banned.")
+				elseif commandReceived == "disconnected" then
+					net.localprint("User "..userName.." disconnceted.")
+				end
+			elseif commandReceived == "passwordUpdate" then
+				net.localprint("Password Updated!")
+			elseif commandReceived == "loginFailed" then
+				net.localprint("Login Failed!")
+			elseif commandReceived == "alreadyLoggedIn" then
+				net.localprint("Already logged in!")
+			elseif commandReceived == "nameTaken" then
+				net.localprint("User name "..string.match(message, ",(%w+)").." already taken!")
+			elseif commandReceived == "connected" then
+				local us = false
+				if lastCommand then
+					if string.match(tChatHistory[#tChatHistory], "/(%a+) ") == "login" or string.match(tChatHistory[#tChatHistory], "/(%a+) ") == "register" then
+						if string.match(tChatHistory[#tChatHistory], "/%a+ (%w+)") == string.match(message, ",(%w+),") then
+							net.localprint("Connected as "..string.match(message, ",(%w+),")..".")
+							us = true
+						end
+					end
+				end
+				if not us then
+					net.localprint("User "..string.match(message, ",(%w+),").." connected.")
+				end
+				local user = {}
+				user.name = string.match(message, ",(%w+),")
+				user.mode = string.match(message, ",(%w+)$")
+				table.insert(connectedUsers, user)
+			elseif commandReceived == "mode" then
+				local userName = string.match(message, ",(%w+),")
+				for uNum, uInfo in ipairs(connectedUsers) do
+					if uInfo.name == userName then
+						uInfo.mode = string.match(message, ",(%w+)$")
+						break
+					end
+				end
+			end
+		end
+end
+
+local tChatHistory = {}
+local serverConnection = false
+local remoteDir = false
+local lastCommand = false
+if tArgs[1] then
+	serverConnection, remoteDir = connection.open(tArgs[1], "lnrcd", 2)
+	if not serverConnection then print("Connection Failed!") else print("Connected to "..tArgs[1]..".") end
+end
+while true do
+	if remoteDir then write(.."> ") else write("chatc: ") end
+	local sLine = chatread(nil, tChatHistory)
+	lastCommand = false
+	table.insert( tChatHistory, sLine )
+	if string.sub(sLine, 1, 1) == "/" then
+		lastCommand = sLine
+	end
+	connection.send(serverConnection, "data", sLine)
+end

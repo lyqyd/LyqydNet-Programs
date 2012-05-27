@@ -1,0 +1,234 @@
+connections = {}
+userTable = {}
+serverMode = "r"
+bannedIDs = {}
+
+function sendPacket(message, exclude)
+	if type(message) == "string" then
+		for uNum, uInfo in pairs(userTable) do
+			if not exclude or uInfo.conn ~= exclude then
+				if uInfo.conn and connections[uInfo.conn] then connection.send(uInfo.conn, message) end
+			end
+		end
+		return true
+	else
+		return false
+	end
+end
+
+function sendMessage(message, exclude)
+	if type(message) == "string" then
+		return sendPacket("p;"..message, exclude)
+	else
+		return false
+	end
+end
+
+function sendCommand(comString, exclude)
+	if type(message) == "string" then
+		return sendPacket("c;"..message, exclude)
+	else
+		return false
+	end
+end
+
+function writeConfig()
+	print("wrote")
+end
+
+function readConfig()
+	print("read")
+end
+
+while true do
+	conn, messType, message = connection.listen("lnrcd")
+	if connections[conn] and connections[conn].status == "open" then
+		if messType == "data" then
+			if string.sub(message, 1, 1) == "/" then
+				--is a command
+				local command = string.match(message, "/(%a+) ")
+				local commandArgs = {}
+				local comString = string.match(mesage, "/%a+ (.*)")
+				for match in string.gmatch(comString, "[^ \t]+") do
+					table.insert( commandArgs, match )
+				end
+				if command == "away" then
+					for uNum, uInfo in ipairs(userTable) do
+						if uInfo.conn and uInfo.conn == conn then
+							if string.len(message) > 5 then
+								uInfo.away = string.match(message, "/away (.*)")
+							else
+								uInfo.away = false
+							end
+							break
+						end
+					end
+				elseif command == "kick" or command == "mode" or command == "ban" then
+					for uNum, uInfo in ipairs(userTable) do
+						if uInfo.conn and uInfo.conn == conn and string.find(uInfo.mode, "o") then
+							local client = false
+							for uNum, uInfo in ipairs(userTable) do
+								if uInfo.name == commandArgs[1] then
+									client = true
+									if command == "kick" then
+										sendCommand("kicked,"..uInfo.name)
+										connection.close(uInfo.conn)
+										connections[uInfo.conn] = false
+										uInfo.conn = false
+									elseif command == "mode" then
+										if commandArgs < 2 then
+											connection.send(conn, "data", "p;"..commandArgs[1]..": "..uInfo.mode)
+										else
+											for l in string.gmatch(commandArgs[2], "-(%a)[%+%-;]") do
+												uInfo.mode = string.gsub(uInfo.mode, l, "")
+											end
+											for l in string.gmatch(commandArgs[2], "+(%a)[%+%-;]") do
+												if not string.find(uInfo.mode, l) then uInfo.mode = uInfo.mode..l end
+											end
+											sendCommand("mode,"..commandArgs[1]..","..uInfo.mode)
+											connection.send(conn, "data", "p;"..commandArgs[1]..": "..uInfo.mode)
+										end
+									elseif command == "ban" then
+										sendCommand("banned,"..uInfo.name)
+										table.insert(bannedIDs, net.CIDFromRoute(connection.route(conn)))
+										connection.close(uInfo.conn)
+										connections[uInfo.conn] = false
+										uInfo.conn = false
+										uInfo.name = false
+										uInfo.pass = false
+									end
+									break
+								end
+							end
+							if not client then
+								--or unsuccessful.
+								connection.send(conn, "data", "p;No such client!")
+							end
+							break
+						end
+					end
+				elseif command == "register" then
+					local taken = false
+					if commandArgs[1] == "server" then
+						connection.send(conn, "data", "c;nameTaken")
+						break
+					end
+					for uNum, uInfo in ipairs(userTable) do
+						if uInfo.name and uInfo.name == commandArgs[1] then
+							taken = true
+							break
+						end
+					end
+					if not taken then
+						newUser = {}
+						newUser.name = string.match(commandArgs[1], "^(%w)")
+						newUser.pass = commandArgs[2]
+						newUser.conn = conn
+						newUser.mode = ""
+						table.insert(userTable, newUser)
+						sendCommand("connected,"..string.match(commandArgs[1], "^(%w)"))
+					else
+						local sameConn = false
+						for uNum, uInfo in ipairs(userTable) do
+							if uInfo.name and uInfo.name = commandArgs[1] then
+								if uInfo.conn and uInfo.conn == conn then
+									sameConn = true
+									uInfo.pass = commandArgs[2]
+									connection.send(conn, "data", "c;passwordUpdated")
+								end
+								break
+							end
+						end
+						if not sameConn then
+							connection.send(conn, "data", "c;nameTaken")
+						end
+					end
+				elseif command == "login" then
+					local login = false
+					for uNum, uInfo in ipairs(userTable) do
+						if uInfo.conn and uInfo.conn == conn then
+							if uInfo.name ~= commandArgs[1] then
+								sendMessage("c;disconnected,"..uInfo.name)
+								uInfo.conn = false
+							else
+								connection.send(conn, "data", "c;alreadyLoggedIn")
+								login = true
+							end
+							break
+						end
+					end
+					if not login then
+						for uNum, uInfo in ipairs(userTable) do
+							if uInfo.name == commandArgs[1] then
+								if uInfo.pass == commandArgs[2] then
+									uInfo.conn = conn
+									sendMessage("c;connected,"..commandArgs[1])
+								else
+									connection.send(conn, "data", "c;loginFailed")
+								break
+							end
+						end
+					end
+			else
+				--This is regular chat.
+				local send = false
+				for uNum, uInfo in ipairs(userTable) do
+					if uInfo.conn and uInfo.conn == conn then
+						if string.find(serverMode, "m") then
+							if string.find(uInfo.mode, "[vo]") then
+								send = true
+							end
+						else
+							send = true
+						end
+						if send then
+							sendMessage(uInfo.name..": "..string.match(message, "^([%w%s%p]+)"))
+							for uNum, uInfo in ipairs(userTable) do
+								if uInfo.name == string.match(message, "^(%w)+") then
+									if uInfo.away then
+										sendMessage(uInfo.name..": "..string.match(uInfo.away, "^([%w%s%p]+)"))
+									end
+								break
+								end
+							end
+						end
+						break
+					end
+				end
+			end
+		elseif messType == "close" then
+			for uNum, uInfo in ipairs(userTable) do
+				if uInfo.conn and uInfo.conn == conn then
+					sendCommand("disconnected,"..uInfo.name, conn)
+					uInfo.conn = false
+					break
+				end
+			end
+			connection.close(conn, disconnect, true)
+			connections[conn] = nil
+		elseif messType == "instruction" then
+			if message == "stop" then
+				return true
+			end
+		end
+	elseif messType == "query" then
+		local banned = false
+		for k, v in ipairs(bannedIDs) do
+			if v == net.CIDFromRoute(connection.route(conn)) then
+				banned = true
+				break
+			end
+		end
+		if not banned then
+			if connections[conn] then
+				connections[conn].status = open
+			else
+				local connect = {}
+				connect.status = open
+				connect.name = connection.name(conn)
+				table.insert(connections, conn, connect)
+			end
+			connection.send(conn, "response", "ok")
+		end
+	end
+end
