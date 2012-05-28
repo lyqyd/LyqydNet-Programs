@@ -33,12 +33,48 @@ function sendCommand(comString, exclude)
 end
 
 function writeConfig()
-	print("wrote")
+	local file = io.open("/etc/lnrcd/users", "w")
+	if file then
+		for uNum, uInfo in ipairs(userTable) do
+			if uInfo.name then
+				file:write(uInfo.name..";"..uInfo.pass..";"..uInfo.mode.."\n")
+			end
+		end
+		file:close()
+	end
+	local file = io.open( "/etc/lnrcd/bans", "w" )
+	if file then
+		for k, v in ipairs(bannedIDs) do
+			file:write(v.."\n")
+		end
+		file:close()
+	end
 end
 
 function readConfig()
-	print("read")
+	if fs.exists("/etc/lnrcd/users") then
+		local file = io.open("/etc/lnrcd/users", "r")
+		local line = file:read()
+		while line do
+			local userEntry = {}
+			userEntry.name, userEntry.pass, userEntry.mode = string.match(line, "^(%w+);([%w%s%p]+);(%w+)$")
+			table.insert(userTable, userEntry)
+			line = file:read()
+		end
+		file:close()
+	end
+	if fs.exists("/etc/lnrcd/bans") then
+		local file = io.open("/etc/lnrcd/users", "r")
+		local line = file:read()
+		while line do
+			table.insert(bannedIDs, line)
+			line = file:read()
+		end
+		file:close()
+	end
 end
+
+readConfig()
 
 while true do
 	conn, messType, message = connection.listen("lnrcd")
@@ -107,6 +143,7 @@ while true do
 							break
 						end
 					end
+					writeConfig()
 				elseif command == "register" then
 					local taken = false
 					if commandArgs[1] == "server" then
@@ -127,6 +164,7 @@ while true do
 						newUser.mode = ""
 						table.insert(userTable, newUser)
 						sendCommand("connected,"..string.match(commandArgs[1], "^(%w)"))
+						writeConfig()
 					else
 						local sameConn = false
 						for uNum, uInfo in ipairs(userTable) do
@@ -135,6 +173,7 @@ while true do
 									sameConn = true
 									uInfo.pass = commandArgs[2]
 									connection.send(conn, "data", "c;passwordUpdated")
+									writeConfig()
 								end
 								break
 							end
@@ -208,6 +247,7 @@ while true do
 			connections[conn] = nil
 		elseif messType == "instruction" then
 			if message == "stop" then
+				writeConfig()
 				return true
 			end
 		end
@@ -229,6 +269,13 @@ while true do
 				table.insert(connections, conn, connect)
 			end
 			connection.send(conn, "response", "ok")
+			local userstring = ""
+			for uNum, uInfo in ipairs(userTable) do
+				if uInfo.conn and uInfo.conn ~= conn then
+					userstring = userstring..uInfo.name..","..uInfo.mode..";"
+				end
+			end
+			connection.send(conn, "data" "c;usersOnline,"..userstring)
 		end
 	end
 end

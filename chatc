@@ -145,6 +145,7 @@ end
 local function processResponse(pType, message)
 	if pType == "SC" then
 		net.localprint("Connection closed by server.")
+		connection.close(serverConnection, "disconnect", true)
 	elseif pType == "SP" then
 		if string.sub(message, 1, 2) == "p;" then
 			message = string.match(message, ";(.*)")
@@ -200,20 +201,28 @@ local function processResponse(pType, message)
 						break
 					end
 				end
+			elseif commandReceived == "usersOnline" then
+				userString = string.match(message, "usersOnline,(.*)")
+				for uName, uMode in string.gmatch(userString, "(%w+),(%w+);")
+					local user = {}
+					user.name = uName
+					user.mode = uMode
+					table.insert(connectedUsers, user)
+				end
 			end
 		end
+	end
 end
 
 local tChatHistory = {}
 local serverConnection = false
-local remoteDir = false
 local lastCommand = false
 if tArgs[1] then
-	serverConnection, remoteDir = connection.open(tArgs[1], "lnrcd", 2)
+	serverConnection = connection.open(tArgs[1], "lnrcd", 2)
 	if not serverConnection then print("Connection Failed!") else print("Connected to "..tArgs[1]..".") end
 end
 while true do
-	if remoteDir then write(.."> ") else write("chatc: ") end
+	if serverConnection then write(.."> ") else write("chatc: ") end
 	local sLine = chatread(nil, tChatHistory)
 	lastCommand = false
 	table.insert( tChatHistory, sLine )
