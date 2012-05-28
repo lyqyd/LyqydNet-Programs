@@ -1,0 +1,176 @@
+local tArgs = { ... }
+if #tArgs ~= 1 or (tArgs[1] ~= "daemon" and tArgs[1] ~= "full") then
+	print( "Usage: nshd <daemon|full>" )
+	return
+end
+
+local daemonMode = true
+if tArgs[1] == "full" then daemonMode = false end
+
+local connections = {}
+
+function netWrite(text)
+	connection.send(conn, "data", "p;"..text)
+end
+
+function netPagedTabulate(...)
+	local tTables = {...}
+	for n, tCurr in pairs(tTables) do
+		table.sort(tCurr)
+		local string = "t;"
+		for i=1, #tCurr do
+			string = string..table.remove(tCurr, 1)..";"
+		end
+		connection.send(conn, "data", string)
+	end
+end
+
+local function nshdGetPacket ()
+	local conn = 0
+	local pType = ""
+	local message = ""
+	if daemonMode then
+		conn, pType, message = connection.listenIdle()
+	else
+		conn, pType, message = connection.listen("nshd")
+	end
+	return conn, pType, message
+end
+
+function netShellDaemon ()
+	local function exLua (string)
+		local nForcePrint = 0
+		local func, e = loadstring( string, "lua" )
+		local func2, e2 = loadstring( "return "..string, "lua" )
+		if not func then
+			if func2 then
+				func = func2
+				e = nil
+				nForcePrint = 1
+			end
+		else
+			if func2 then
+				func = func2
+			end
+		end
+		
+		if func then
+			setfenv( func, tEnv )
+			local tResults = { pcall( function() return func() end ) }
+			if tResults[1] then
+				local n = 1
+				while (tResults[n + 1] ~= nil) or (n <= nForcePrint) do
+					connection.send(conn, "data", "p;"..tostring(tResults[n + 1]))
+					n = n + 1
+				end
+			else
+				connection.send(conn, "data", "p;"..tResults[2])
+			end
+		else
+			connection.send(conn, "data", "p;"..e)
+		end
+	end
+
+	local function exShell (string)
+		local tWords = {}
+		for match in string.gmatch(string, "[^ \t]+") do
+			table.insert( tWords, match )
+		end
+
+		local sCommand = tWords[1]
+		if sCommand then
+			if shell.resolveProgram(sCommand) == "rom/programs/cd" then
+				if #tWords < 2 then
+					print( "Usage: cd <path>" )
+				else
+					local sNewDir = shell.resolve( tWords[2] )
+					if fs.isDir( sNewDir ) then
+						connections[conn].netDir = sNewDir
+					else
+						print( "Not a directory" )
+					end
+				end
+			elseif shell.resolveProgram(sCommand) == "rom/programs/edit" then
+				localFile = shell.resolve(tWords[2])
+				netfile.send(conn, localFile)
+				netfile.receive(conn, localFile)
+			else
+				local localDir = shell.dir()
+				shell.setDir (connections[conn].netDir)
+				shell.run( sCommand, unpack( tWords, 2 ) )
+				shell.setDir (localDir)
+			end
+		end
+	end
+	
+	nshdExit = false
+	
+	--initialization
+	while not nshdExit do
+		conn, packetType, message = nshdGetPacket()
+		if conn == 0 then
+			--daemon command logic
+		else
+			if connections[conn] and connections[conn].status == "open" then
+				if packetType == "data" then
+					--if not daemonMode then print("Remote Command: "..message) end
+					print("Remote Command: "..message)
+					oldWrite = write
+					oldPrint = print
+					oldPT = textutils.pagedTabulate
+					write = netWrite
+					print = netWrite
+					textutils.pagedTabulate = netPagedTabulate
+					if message == "lua" then
+						connections[conn].mode = "lua"
+					elseif connections[conn].mode and connections[conn].mode == "lua" then
+						if message == "exit()" then connections[conn].mode = nil end
+						exLua(message)
+					else
+						if message == "reboot" or message == "exit" or message == "shutdown" then
+							for cNum, cInfo in pairs(connections) do
+								connection.send(cNum, "close", "end")
+							end
+						end
+						exShell(message)
+					end
+					print = oldPrint
+					write = oldWrite
+					textutils.pagedTabulate = oldPT
+					connection.send(conn, "done", connections[conn].netDir)
+				elseif packetType == "query" then
+					--reset connection
+					connections[conn].status = "open"
+					connections[conn].mode = nil
+					connections[conn].netDir = "/"
+					connection.send(conn, "response", "/")
+					if not daemonMode then print("Client reconnected: "..connection.name(conn)) end
+				elseif packetType == "close" then
+					table.remove(connections, conn)
+					if not daemonMode then print("Client disconnected: "..connection.name(conn)) end
+					--close connection
+				else
+					--error
+				end
+			elseif packetType ~= "query" then
+				connection.close(conn)
+				--client thinks connection is open, but server thinks it isn't.
+			else
+				--open new connection
+				local connInfo = {}
+				connInfo.status = "open"
+				connInfo.mode = nil
+				connInfo.netDir = "/"
+				table.insert(connections, conn, connInfo)
+				connection.send(conn, "response", "/")
+				if not daemonMode then print("Client connected: "..connection.name(conn)) end
+			end
+		end
+	end
+end
+
+if daemonMode then
+	net.daemonAdd("nshd", netShellDaemon)
+else
+	netShellDaemon()
+end
