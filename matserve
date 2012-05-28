@@ -1,0 +1,130 @@
+connections = {}
+nodeTable = {}
+lockedNodes = {}
+
+local function parseAttributes (attrString)
+	attrTable = {}
+	for t, s in string.gmatch(attrString, "(%a+)>(.-);") do
+		newAttribute = {}
+		if t == "drop" or t == "fill" then
+			x, z, y, xDir, zDir = string.match(s, "(%-?%d+),(%-?%d+),(%d+),(%-?[01]),(%-?[01])")
+			newAttribute = {type = t, loc = location.new(x, y, z), orientation = location.getOrientation(xDir, zDir)}
+			if t == "fill" then newAttribute.side = string.match(s, ",(%a+)") end
+		elseif t == "source" then
+			newAttribute = {type = t, server = s}
+		end
+		table.insert(attrTable, newAttribute)
+	end
+	return attrTable
+end
+
+local function loadNodeTable ()
+	if fs.exists( "etc/nodes" ) then
+		local file = io.open( "etc/nodes", "r" )
+		local sLine = file:read()
+		while sLine do
+			nodeType = string.match(sLine, "node:(%a+)>")
+			if nodeType ~= "space" then newNode = {type = nodeType} end
+			if nodeType == "space" then
+				local xmin, zmin, ymin, xmax, zmax, ymax, negtravel, postravel = string.match(sLine, "node:space>(%-?%d+),(%d+),(%-?%d+),(%-?%d+),(%d+),(%-?%d+);travel>(%d+),(%d+);")
+				nodeTable.space = {min = location.new(xmin, ymin, zmin), max = location.new(xmax, ymax, zmax)}
+				nodeTable.travel = {neg = negtravel, pos = postravel}
+			elseif nodeType == "craft" then
+				local quan, crafted, craftstring = string.match(sLine, "node:craft>(%d+)%.([%a_]+)=(.-);")
+				newNode.craft = {item = crafted, quantity = quan}
+				local ingredCount = 0
+				for q, i in string.gmatch(craftstring, "(%d+)%.([%a_]+),") do
+					local ingredientTable = {quantity = q, ingredient = i}
+					ingredCount = ingredCount + 1
+					table.insert(newNode.craft, ingredientTable)
+				end
+				newNode.craft.ingredients = ingredCount 
+				newNode.attributes = parseAttributes(string.match(sLine, "node:craft>%d+%.[%a_]+=.-;(.+;)"))
+			elseif nodeType == "smelter" then
+				smeltstring = string,match(sLine, "node:smelter>(.-);")
+				for p, i in string.gmatch(smeltstring, "([%a_]+)=([%a_]+)") do
+					local smeltTable = {product = p, ingredient = i}
+					table.insert(newNode.smelt)
+				end
+				newNode.attributes = parseAttributes(string.match(sLine, "node:smelter>.-;(.+;)"))
+			elseif nodeType == "storage" or nodeType == "supply" then
+				newNode.item = string.match(sLine, "node:%a+>([%a_]+);")
+				newNode.attributes = parseAttributes(string.match(sLine, "node:%a+>[%a_]+;(.+;)"))
+			elseif nodeType == "idle" then
+				local newNode = {}
+				local x, z, y = string.match(sLine, "node:idle>(%-?%d+),(%-?%d+),(%d+);")
+				newNode.loc = location.new(x, y, z)
+			end
+			if nodeType ~= "space" then table.insert(nodeTable, newNode) end
+			sLine = file:read()
+		end
+		file:close()
+	else
+		return false
+	end
+	return true
+end
+
+function materialServer ()
+	loadNodeTable()
+	while true do
+		conn, messType, message = connection.listenIdle()
+		if connections[conn] and connections[conn].status == "open" then
+			if messType == "data" then
+				if message == "nodelist" then
+					netfile.send(conn, "etc/nodes")
+				elseif message == "idle" then
+					nodeNum = nil
+					for nNum, nInfo in pairs(lockedNodes) do
+						if nInfo == conn then
+							if nodeTable[nNum].type == "idle" then
+								if not nodeNum then nodeNum = nNum end
+							else
+								lockedNodes[nNum] = nil
+							end
+						end
+					end
+					if not nodeNum then
+						for nNum, nInfo in ipairs(nodeTable) do
+							if nInfo.type == "idle" and not lockedNodes[nNum] then
+								lockedNodes[nNum] = conn
+								nodeNum = nNum
+							end
+						end
+					end
+					if nodeNum then
+						connection.send(conn, "data", nodeNum)
+					end
+				elseif message == "smelt"
+					nodeNum = nil
+					for nNum, nInfo in ipairs(nodeTable) do
+						if nInfo.type == "smelter" then
+							if not lockedNodes[nNum] then
+								if not nodeNum then nodeNum = nNum end
+							end
+						end
+					end
+					if nodeNum then
+						connection.send(conn, "data", nodeNum)
+					end
+			elseif messType == "close" then
+				connection.close(conn, disconnect, true)
+				connections[conn] = nil
+			elseif messType == "instruction" then
+				if message == "stop" then
+					return true
+				end
+			end
+		elseif messType == "query" then
+			if connections[conn] then
+				connections[conn].status = open
+			else
+				local connect = {}
+				connect.status = open
+				connect.name = connection.name(conn)
+				table.insert(connections, conn, connect)
+			end
+			connection.send(conn, "response", "ok")
+		end
+	end
+end
