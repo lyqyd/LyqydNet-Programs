@@ -37,6 +37,38 @@ local function nshdGetPacket ()
 	return conn, pType, message
 end
 
+local function exShell (string)
+	local tWords = {}
+	for match in string.gmatch(string, "[^ \t]+") do
+		table.insert( tWords, match )
+	end
+
+	local sCommand = tWords[1]
+	if sCommand then
+		if shell.resolveProgram(sCommand) == "rom/programs/cd" then
+			if #tWords < 2 then
+				print( "Usage: cd <path>" )
+			else
+				local sNewDir = shell.resolve( tWords[2] )
+				if fs.isDir( sNewDir ) then
+					connections[conn].netDir = sNewDir
+				else
+					print( "Not a directory" )
+				end
+			end
+		elseif shell.resolveProgram(sCommand) == "rom/programs/edit" then
+			localFile = shell.resolve(tWords[2])
+			netfile.send(conn, localFile)
+			netfile.receive(conn, localFile)
+		else
+			local localDir = shell.dir()
+			shell.setDir (connections[conn].netDir)
+			shell.run( sCommand, unpack( tWords, 2 ) )
+			shell.setDir (localDir)
+		end
+	end
+end
+
 function netShellDaemon ()
 	local function exLua (string)
 		local nForcePrint = 0
@@ -68,38 +100,6 @@ function netShellDaemon ()
 			end
 		else
 			connection.send(conn, "data", "p;"..e)
-		end
-	end
-
-	local function exShell (string)
-		local tWords = {}
-		for match in string.gmatch(string, "[^ \t]+") do
-			table.insert( tWords, match )
-		end
-
-		local sCommand = tWords[1]
-		if sCommand then
-			if shell.resolveProgram(sCommand) == "rom/programs/cd" then
-				if #tWords < 2 then
-					print( "Usage: cd <path>" )
-				else
-					local sNewDir = shell.resolve( tWords[2] )
-					if fs.isDir( sNewDir ) then
-						connections[conn].netDir = sNewDir
-					else
-						print( "Not a directory" )
-					end
-				end
-			elseif shell.resolveProgram(sCommand) == "rom/programs/edit" then
-				localFile = shell.resolve(tWords[2])
-				netfile.send(conn, localFile)
-				netfile.receive(conn, localFile)
-			else
-				local localDir = shell.dir()
-				shell.setDir (connections[conn].netDir)
-				shell.run( sCommand, unpack( tWords, 2 ) )
-				shell.setDir (localDir)
-			end
 		end
 	end
 	
