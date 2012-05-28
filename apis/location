@@ -1,0 +1,79 @@
+local location = {
+	add = function( self, o )
+		return vector.new(
+			self.x + o.x,
+			self.y + o.y,
+			self.z + o.z
+		)
+	end,
+	sub = function( self, o )
+		return vector.new(
+			self.x - o.x,
+			self.y - o.y,
+			self.z - o.z
+		)
+	end,
+	mul = function( self, m )
+		return location.new(
+			self.x * m,
+			self.y * m,
+			self.z * m,
+			self.h
+		)
+	end,
+	tostring = function( self )
+		return self.x..","..self.y..","..self.z..","..self.h
+	end,
+}
+
+local vmetatable = {
+	__index = location,
+	__add = location.add,
+	__sub = location.sub,
+	__mul = location.mul,
+	__unm = function( l ) return l:mul(-1) end,
+	__tostring = location.tostring,
+}
+
+function new( x, y, z, h )
+	local l = {
+		x = x or 0,
+		y = y or 0,
+		z = z or 0,
+		h = h or 1
+	}
+	setmetatable( l, vmetatable )
+	return l
+end
+
+function left(orientation)
+	if turtle then turtle.turnLeft() end
+	orientation = orientation - 1
+	if orientation < 1 then orientation = orientation + 4 end
+	return orientation
+end
+
+function right(orientation)
+	if turtle then turtle.turnRight() end
+	orientation = orientation + 1
+	if orientation > 4 then orientation = orientation - 4 end
+	return orientation
+end
+
+function getOrientation(x, z)
+	return ((x + math.abs(x) * 2) + (z + math.abs(z) * 3))
+end
+
+function getMovements(loc)
+	return (loc.h - 2) * (loc.h % 2), (loc.h - 3) * ((loc.h + 1) % 2)
+end
+
+--[[
+-x 1 (west)
+-z 2 (north)
++x 3 (east)
++z 4 (south)
+
+turn right, add one.
+turn left, sub one.
+--]]
