@@ -1,0 +1,100 @@
+
+local function printUsage()
+	print( "Usages:" )
+	print( "gpsd host" )
+	print( "gpsd host <x> <y> <z>" )
+	print( "gps locate" )
+end
+
+local tArgs = { ... }
+if #tArgs < 1 then
+	printUsage()
+	return
+end
+
+x, y, z = nil, nil, nil
+
+local function readNumber()
+	local num = nil
+	while num == nil do
+		num = tonumber(read())
+		if not num then
+			write( "Not a number. Try again: " )
+		end
+	end
+	return math.floor( num + 0.5 )
+end
+
+local function open()
+	local bOpen, sFreeSide = false, nil
+	for n,sSide in pairs(rs.getSides()) do	
+		if peripheral.getType( sSide ) == "modem" then
+			sFreeSide = sSide
+			if rednet.isOpen( sSide ) then
+				bOpen = true
+				break
+			end
+		end
+	end
+	
+	if not bOpen then
+		if sFreeSide then
+			print( "No modem active. Opening "..sFreeSide.." modem" )
+			rednet.open( sFreeSide )
+			return true
+		else
+			print( "No modem attached" )
+			return false
+		end
+	end
+	return true
+end
+
+function serveRequests()
+	if fs.exists( "etc/location" ) then
+		local file = io.open( "etc/location", "r" )
+		local sLine = file:read()
+		if sLine then x, y, z = string.match(sLine, "(%-?%d+),(%d+),(%-?%d+)") end
+		file:close()
+	end
+	while true do
+		conn, messType, message = connection.listenIdle()
+		if messType == "query" then
+			connection.close(conn, "gpsd;"..x..","..y..","..z)
+		end
+	end
+end
+	
+local sCommand = tArgs[1]
+if sCommand == "locate" then
+	if open() then
+		lygps.locate( 2, true )
+	end
+	
+elseif sCommand == "host" then
+	if turtle then return false end
+	if #tArgs >= 4 then
+		x = tonumber(tArgs[2])
+		y = tonumber(tArgs[3])
+		z = tonumber(tArgs[4])
+		if x == nil or y == nil or z == nil then
+			printUsage()
+			return
+		end
+	else
+		x, y, z = lygps.locate(2, true)
+		if x == nil then
+			print( "Run \"gps host <x> <y> <z>\" to set position manually" )
+			return
+		end
+	end
+	local file = io.open( "etc/location", "w" )
+	if file then
+		file:write( x..","..y..","..z.."\n" )
+		file:close()
+	end
+	net.daemonAdd("gpsd", serveRequests)
+else
+	printUsage()
+	return
+end
