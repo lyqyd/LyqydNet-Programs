@@ -96,17 +96,15 @@ function fileDaemon ()
 				end
 			elseif messType == "fileSend" then
 				connections[conn].filename = shell.resolve(message)
-				connections[conn].file = {}
+				connections[conn].file = nil
 				connection.send(conn, "fileResponse", "ok")
 			elseif messType == "fileData" then
-				table.insert(connections[conn].file, message)
+				connections[conn].file = message
 			elseif messType == "fileEnd" then
 				if connections[conn].filename then
 					file = io.open(connections[conn].filename, "w")
 					if file then
-						for i, line in ipairs(connections[conn].file) do
-							file:write(line .. "\n")
-						end
+						file:write(connections[conn].file.."\n")
 						file:close()
 					end
 				end
