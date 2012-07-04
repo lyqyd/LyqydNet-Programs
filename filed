@@ -19,7 +19,7 @@ end
 function fileDaemon ()
 	if not fs.isDir("share") then fs.makeDir("share") end
 	while true do
-		conn, messType, message = connection.listenIdle()
+		conn, messType, message = connection.listenIdle(21)
 		if connections[conn] and connections[conn].status == "open" then
 			localDir = shell.dir()
 			shell.setDir(connections[conn].directory)
@@ -136,5 +136,5 @@ function fileDaemon ()
 	end
 end
 
-net.daemonAdd("filed", fileDaemon)
+net.daemonAdd("filed", fileDaemon, 21)
 	

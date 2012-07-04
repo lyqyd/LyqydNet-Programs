@@ -30,11 +30,44 @@ local function nshdGetPacket ()
 	local pType = ""
 	local message = ""
 	if daemonMode then
-		conn, pType, message = connection.listenIdle()
+		conn, pType, message = connection.listenIdle(23)
 	else
-		conn, pType, message = connection.listen("nshd")
+		conn, pType, message = connection.listen(23)
 	end
 	return conn, pType, message
+end
+
+local function exLua (string)
+	local nForcePrint = 0
+	local func, e = loadstring( string, "lua" )
+	local func2, e2 = loadstring( "return "..string, "lua" )
+	if not func then
+		if func2 then
+			func = func2
+			e = nil
+			nForcePrint = 1
+		end
+	else
+		if func2 then
+			func = func2
+		end
+	end
+	
+	if func then
+		setfenv( func, tEnv )
+		local tResults = { pcall( function() return func() end ) }
+		if tResults[1] then
+			local n = 1
+			while (tResults[n + 1] ~= nil) or (n <= nForcePrint) do
+				connection.send(conn, "data", "p;"..tostring(tResults[n + 1]))
+				n = n + 1
+			end
+		else
+			connection.send(conn, "data", "p;"..tResults[2])
+		end
+	else
+		connection.send(conn, "data", "p;"..e)
+	end
 end
 
 local function exShell (string)
@@ -70,39 +103,6 @@ local function exShell (string)
 end
 
 function netShellDaemon ()
-	local function exLua (string)
-		local nForcePrint = 0
-		local func, e = loadstring( string, "lua" )
-		local func2, e2 = loadstring( "return "..string, "lua" )
-		if not func then
-			if func2 then
-				func = func2
-				e = nil
-				nForcePrint = 1
-			end
-		else
-			if func2 then
-				func = func2
-			end
-		end
-		
-		if func then
-			setfenv( func, tEnv )
-			local tResults = { pcall( function() return func() end ) }
-			if tResults[1] then
-				local n = 1
-				while (tResults[n + 1] ~= nil) or (n <= nForcePrint) do
-					connection.send(conn, "data", "p;"..tostring(tResults[n + 1]))
-					n = n + 1
-				end
-			else
-				connection.send(conn, "data", "p;"..tResults[2])
-			end
-		else
-			connection.send(conn, "data", "p;"..e)
-		end
-	end
-	
 	nshdExit = false
 	
 	--initialization
@@ -170,7 +170,7 @@ function netShellDaemon ()
 end
 
 if daemonMode then
-	net.daemonAdd("nshd", netShellDaemon)
+	net.daemonAdd("nshd", netShellDaemon, 23)
 else
 	netShellDaemon()
 end

@@ -29,7 +29,7 @@ local tNetShellHistory = {}
 local serverConnection = false
 local remoteDir = false
 if tArgs[1] then
-	serverConnection, remoteDir = connection.open(tArgs[1], "filed", 2)
+	serverConnection, remoteDir = connection.open(tArgs[1], 21, 2)
 	if not serverConnection then print("Connection Failed!") else print("Connected to "..tArgs[1]..".") end
 end
 while true do
@@ -42,7 +42,7 @@ while true do
 	end
 	if commandArgs[1] == "open" then
 		if commandArgs[2] then
-			serverConnection, remoteDir = connection.open(commandArgs[2], "filed", 2)
+			serverConnection, remoteDir = connection.open(commandArgs[2], 21, 2)
 			if not serverConnection then print("Connection Failed!") else print("Connected to "..string.match(sLine, "open (.*)")..".") end
 		else
 			print("No server specified!")
