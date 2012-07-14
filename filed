@@ -20,6 +20,7 @@ function fileDaemon ()
 	if not fs.isDir("share") then fs.makeDir("share") end
 	while true do
 		conn, messType, message = connection.listenIdle(21)
+		term.redirect(connection.text(conn))
 		if connections[conn] and connections[conn].status == "open" then
 			localDir = shell.dir()
 			shell.setDir(connections[conn].directory)
@@ -133,6 +134,7 @@ function fileDaemon ()
 			table.insert(connections, conn, connect)
 			connection.send(conn, "response", connections[conn].directory)
 		end
+		term.restore()
 	end
 end
 

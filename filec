@@ -12,7 +12,7 @@ local function gatherResponse(conn)
 					message = string.match(message, ";(.*)")
 					if message ~= "\n" then print(message) end
 				elseif string.sub(message, 1, 2) == "t;" then
-					message = string.sub(message, 3) 
+					message = string.sub(message, 3)
 					local result = {}
 					for s in string.gmatch(message, "(.-);") do
 						table.insert(result, s)
@@ -31,6 +31,7 @@ local remoteDir = false
 if tArgs[1] then
 	serverConnection, remoteDir = connection.open(tArgs[1], 21, 2)
 	if not serverConnection then print("Connection Failed!") else print("Connected to "..tArgs[1]..".") end
+	if remoteDir then remoteDir = string.match(remoteDir, ";(.*)") end
 end
 while true do
 	if remoteDir then write(remoteDir.."> ") else write("filec: ") end
