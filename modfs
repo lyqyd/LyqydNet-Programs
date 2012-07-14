@@ -2,28 +2,13 @@ for k, v in pairs(fs) do
 	oldfs[k] = v
 end
 
+oldioOpen = io.open
+
 newfs = {}
-
-newfs.copy = function(source, dest)
-	if string.find(source, "^/?remote/") or string.find(dest, "^/?remote/") then
-		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), filed, 2)
-		if not serverConn then return {} end
-		local remotePath = string.match(path, "^/?remote/%w+/(.*)")
-		--operate on remote files before calling oldfs equivalent
-	end
-	return oldfs.copy(source, dest)
-end
-
-newfs.move = function(source, dest)
-	if string.find(source, "^/?remote/") or string.find(dest, "^/?remote/") then
-		--operate on remote files before calling oldfs equivalent
-	end
-	return oldfs.move(source, dest)
-end
 
 newfs.list = function(path)
 	if string.find(path, "^/?remote/") then
-		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/?"), filed, 2)
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/?"), 21, 2)
 		if not serverConn then return {} end
 		local lsString = "ls"
 		local remotePath = string.match(path, "^/?remote/%w+/(.*)")
@@ -35,8 +20,284 @@ newfs.list = function(path)
 		local result = {}
 		for s in string.gmatch(message, "(.-);") do
 			table.insert(result, s)
-		end
-		return result
+		return
+		end result
 	end
 	return oldfs.list(path)
+end
+
+newfs.exists = function(path)
+	if string.find(path, "^/?remote/") then
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+		if not serverConn then return false end
+		connection.send(serverConn, "fileStatus", string.match(path, "^/?remote/%w+/(.*)"))
+		local messType, message = connection.awaitResponse(serverConn, 2)
+		connection.close(serverConn)
+		if messType then
+			if string.find(message, "e;")) then
+				return true
+			else
+				return false
+			end
+		else
+			return false
+		end
+	else
+		return oldfs.exists(path)
+	end
+end
+
+newfs.isDir = function(path)
+	if string.find(path, "^/?remote/") then
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+		if not serverConn then return false end
+		connection.send(serverConn, "fileStatus", string.match(path, "^/?remote/%w+/(.*)"))
+		local messType, message = connection.awaitResponse(serverConn, 2)
+		connection.close(serverConn)
+		if messType then
+			if string.find(message, "d;")) then
+				return true
+			else
+				return false
+			end
+		else
+			return false
+		end
+	else
+		return oldfs.isDir(path)
+	end
+end
+
+newfs.isReadOnly = function(path)
+	if string.find(path, "^/?remote/") then
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+		if not serverConn then return false end
+		connection.send(serverConn, "fileStatus", string.match(path, "^/?remote/%w+/(.*)"))
+		local messType, message = connection.awaitResponse(serverConn, 2)
+		connection.close(serverConn)
+		if messType then
+			if string.find(message, "r;")) then
+				return true
+			else
+				return false
+			end
+		else
+			return false
+		end
+	else
+		return oldfs.isReadOnly(path)
+	end
+end
+
+newfs.getName = function(path)
+	if string.find(path, "^/?remote/") then
+		return string.match(path, "/%w+$")
+	else
+		return oldfs.getName(path)
+	end
+end
+
+newfs.getDrive = function(path)
+	if string.find(path, "^/?remote/") then
+		return "remote"
+	else
+		return oldfs.getDrive(path)
+	end
+end
+
+newfs.getSize = function(path)
+	if string.find(path, "^/?remote/") then
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+		if not serverConn then return nil end
+		connection.send(serverConn, "fileStatus", string.match(path, "^/?remote/%w+/(.*)"))
+		local messType, message = connection.awaitResponse(serverConn, 2)
+		connection.close(serverConn)
+		if messType then
+			return tonumber(string.match(message, "s;(.*)"))
+		else
+			return nil
+		end
+	else
+		return oldfs.getSize(path)
+	end
+end
+
+newfs.makeDir = function(path)
+	if string.find(path, "^/?remote/") then
+		local dirPath = string.match(path, "^/?remote/%w+/(.*)")
+		if not dirPath then return nil end
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+		if not serverConn then return nil end
+		connection.send(serverConn, "fileMakeDirectory", dirPath)
+		connection.close(serverConn)
+		return nil
+	else
+		return oldfs.makeDir(path)
+	end
+end
+
+newfs.move = function(source, dest)
+	if string.find(source, "^/?remote/") then
+		local serverConn = connection.open(string.match(source, "^/?remote/(%w+)/"), 21, 2)
+		if not serverConn then return nil end
+		if not netfile.get(serverConn, string.match(source, "^/?remote/%w+/(.*)"), ".remote/"..string.match(source, "^/?remote/(.*)"), 2) then return nil end
+		connection.close(serverConn)
+		source = ".remote/"..string.match(source, "^/?remote/(.*)")
+	end
+	oldfs.move(source, dest)
+		--operate on remote files before calling oldfs equivalent
+	if string.find(source, "^.remote/") then
+		local serverConn = connection.open(string.match(dest, "^.remote/(%w+)/"), 21, 2)
+		connection.send(serverConn, "fileDelete", string.match(dest, "^.remote/%w+/(.*)"))
+		connection.close(serverConn)
+		oldfs.delete(source)
+	end
+	if string.find(dest, "^.remote/") then
+		local serverConn = connection.open(string.match(dest, "^.remote/(%w+)/"), 21, 2)
+		netfile.put(serverConn, dest, string.match(dest, "^.remote/%w+/(.*)"), 2)
+		connection.close(serverConn)
+		oldfs.delete(dest)
+	end
+end
+
+newfs.copy = function(source, dest)
+	if string.find(source, "^/?remote/") then
+		local serverConn = connection.open(string.match(source, "^/?remote/(%w+)/"), 21, 2)
+		if not serverConn then return nil end
+		if not netfile.get(serverConn, string.match(source, "^/?remote/%w+/(.*)"), ".remote/"..string.match(source, "^/?remote/(.*)"), 2) then return nil end
+		connection.close(serverConn)
+		source = ".remote/"..string.match(source, "^/?remote/(.*)")
+	end
+	oldfs.copy(source, dest)
+		--operate on remote files before calling oldfs equivalent
+	if string.find(source, "^.remote/") then
+		oldfs.delete(source)
+	end
+	if string.find(dest, "^.remote/") then
+		local serverConn = connection.open(string.match(dest, "^.remote/(%w+)/"), 21, 2)
+		netfile.put(serverConn, dest, string.match(dest, "^.remote/%w+/(.*)"), 2)
+		connection.close(serverConn)
+		oldfs.delete(dest)
+	end
+end
+
+for k, v in pairs(newfs) do
+	fs[k] = v
+end
+
+io.open = function (path, _mode )
+	local isRemote = false
+	if string.find(path, "^/?remote/") then
+		isRemote = true
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+		if not serverConn then return nil end
+		if not netfile.get(serverConn, string.match(path, "^/?remote/%w+/(.*)"), ".remote/"..string.match(path, "^/?remote/(.*)"), 2) then return nil end
+		connection.close(serverConn)
+		path = ".remote/"..string.match(path, "^/?remote/(.*)")
+	end
+	local mode = _mode or "r"
+	local file = fs.open( path, mode )
+	if not file then
+		return nil
+	end
+	local fileTable = {}
+	fileTable.bFileHandle = true
+	fileTable.bClosed = false
+	if isRemote then fileTable.path = path end
+	if mode == "r" then
+		if isRemote then
+			fileTable.close = function(self)
+				file.close()
+				fs.delete(self.path)
+				self.bClosed = true
+			end
+		else
+			fileTable.close = function(self)
+				file.close()
+				self.bClosed = true
+			end
+		end
+		fileTable.read = function( self, _format )
+			local format = _format or "*l"
+			if format == "*l" then
+				return file.readLine()
+			elseif format == "*a" then
+				return file.readAll()
+			else
+				error( "Unsupported format" )
+			end
+			return nil
+		end
+		fileTable.lines = function(self)
+			return function()
+				local sLine = file.readLine()
+				if sLine == nil then
+					self.close()
+				end
+				return sLine
+			end
+		end
+	elseif mode == "w" or mode == "a" then
+		if isRemote then				
+			fileTable.close = function(self)
+				file.close()
+				local serverConn = connection.open(string.match(self.path, "^.remote/(%w+)/"), 21, 2)
+				if serverConn then
+					netfile.put(serverConn, self.path, string.match(self.path, "^.remote/%w+/(.*)"), 2)
+					connection.close(serverConn)
+					fs.delete(self.path)
+				end
+				self.bClosed = true
+			end
+		else
+			fileTable.close = function(self)
+				file.close()
+				self.bClosed = true
+			end
+		end
+		fileTable.write = function( self, _sText )
+			file.write( _sText )
+		end	
+	elseif mode == "rb" then
+		if isRemote then
+			fileTable.close = function(self)
+				file.close()
+				fs.delete(self.path)
+				self.bClosed = true
+			end
+		else				
+			fileTable.close = function(self)
+				file.close()
+				self.bClosed = true
+			end
+		end
+		fileTable.read = function(self)
+			return file.read()
+		end		
+	elseif mode == "wb" or mode == "ab" then
+		if isRemote then
+			fileTable.close = function(self)
+				file.close()
+				local serverConn = connection.open(string.match(self.path, "^.remote/(%w+)/"), 21, 2)
+				if serverConn then
+					netfile.put(serverConn, self.path, string.match(self.path, "^.remote/%w+/(.*)"), 2)
+					connection.close(serverConn)
+					fs.delete(self.path)
+				end
+				self.bClosed = true
+			end
+		else		
+			filetable.close = function(self)
+				file.close()
+				self.bClosed = true
+			end
+		end
+		filetable.write = function( self, _number )
+			file.write( _number )
+		end
+	else
+		file.close()
+		error( "Unsupported mode" )	
+	end
+	return fileTable
 end

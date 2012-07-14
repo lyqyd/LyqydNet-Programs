@@ -20,7 +20,7 @@ function fileDaemon ()
 	if not fs.isDir("share") then fs.makeDir("share") end
 	while true do
 		conn, messType, message = connection.listenIdle(21)
-		term.redirect(connection.text(conn))
+		--term.redirect(connection.text(conn))
 		if connections[conn] and connections[conn].status == "open" then
 			localDir = shell.dir()
 			shell.setDir(connections[conn].directory)
@@ -63,6 +63,18 @@ function fileDaemon ()
 				table.sort(tDirs)
 				table.sort(tFiles)
 				netPagedTabulate(tDirs, tFiles)
+			elseif messType == "fileStatus" then
+				local path = shell.resolve(message)
+				local exists = fs.exists(path)
+				local isDir = fs.isDir(path)
+				local readOnly = fs.isReadOnly(path)
+				local size = fs.getSize(path)
+				local string = ""
+				if exists then string = string.."e;" end
+				if isDir then string = string.."d;" end
+				if readOnly then string = string.."r;" end
+				if size then string = string.."s;"..size end
+				connection.send(conn, "fileInformation", string)
 			elseif messType == "fileCopy" or messType == "fileMove" then
 				source, dest = string.match(message, "(%w+) (%w+)")
 				source = shell.resolve(source)
