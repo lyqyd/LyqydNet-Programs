@@ -6,9 +6,6 @@ newfs = {}
 
 newfs.copy = function(source, dest)
 	if string.find(source, "^/?remote/") or string.find(dest, "^/?remote/") then
-		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), filed, 2)
-		if not serverConn then return {} end
-		local remotePath = string.match(path, "^/?remote/%w+/(.*)")
 		--operate on remote files before calling oldfs equivalent
 	end
 	return oldfs.copy(source, dest)
@@ -40,3 +37,16 @@ newfs.list = function(path)
 	end
 	return oldfs.list(path)
 end
+
+newfs.open = function(path)
+	if string.find(path, "^/?remote/") then
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/?"), filed, 2)
+		if not serverConn then return {} end
+		netfile.get(serverConn, string.match(path, "^/?remote/%w+/(.*)",), "/.remote/"..string.match(path, "^/?remote/(.*)"), 2)
+		connection.close(serverConn)
+		local fileHandle = oldfs.open(".remote/"..string.match(path, "^/?remote/(.*)"))
+		fileHandle.oldClose = fileHandle.close
+		fileHandle.location = string.match("")
+		fileHandle.close = function()
+			fileHandle.oldClose()
+			connection.open()
