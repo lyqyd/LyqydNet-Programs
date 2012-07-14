@@ -11,7 +11,7 @@ if tArgs[1] == "route" then
 	end
 
 elseif tArgs[1] == "shell" and #tArgs == 2 then
-	local serverConnection, remoteDir = connection.open(tArgs[2], "nshd", 10)
+	local serverConnection, remoteDir = connection.open(tArgs[2], 23, 10)
 	if not serverConnection then
 		print("Connection Failed")
 		return
@@ -40,18 +40,8 @@ elseif tArgs[1] == "shell" and #tArgs == 2 then
 				if messType == "close" then
 					print("Connection closed by server.")
 					return
-				elseif messType == "data" then
-					if string.sub(message, 1, 2) == "p;" then
-						message = string.match(message, ";(.*)")
-						if message ~= "\n" then print(message) end
-					elseif string.sub(message, 1, 2) == "t;" then
-						message = string.sub(message, 3) 
-						local result = {}
-						for s in string.gmatch(message, "(.-);") do
-							table.insert(result, s)
-						end
-						textutils.pagedTabulate(result)
-					end
+				elseif string.sub(messType, 1, 4) == "text" then
+					connection.processText(serverConnection, messType, message)
 				else
 				end
 			end
