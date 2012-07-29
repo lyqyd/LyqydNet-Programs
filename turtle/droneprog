@@ -81,19 +81,19 @@ local function loadNodeTable ()
 	return true
 end
 
-local function orient(loc, orient)
-	while loc.h ~= orient do
-		if loc.h > orient and (loc.h ~= 4 and orient ~= 1) then
-			loc.h = location.right(loc.h)
+local function orient(loc, head)
+	while loc.h ~= head do
+		if loc.h > head and (loc.h ~= 4 and head ~= 1) then
+			loc:right(loc)
 		else
-			loc.h = location.left(loc.h)
+			loc = location.left(loc)
 		end
 	end
 	return loc
 end
 
-local function orientAndHeight(loc, orient)
-	loc = orient(loc, orient)
+local function orientAndHeight(loc, head)
+	loc = orient(loc, head)
 	if loc.y ~= nodeTable.travel.pos and loc.h > 2 then
 		while loc.y ~= nodeTable.travel.pos do
 			if loc.y - nodeTabel.travel.pos < 0 then

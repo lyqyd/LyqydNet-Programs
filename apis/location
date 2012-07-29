@@ -1,27 +1,90 @@
 local location = {
-	add = function( self, o )
+	add = function(self, o)
 		return vector.new(
 			self.x + o.x,
 			self.y + o.y,
 			self.z + o.z
 		)
 	end,
-	sub = function( self, o )
+	sub = function(self, o)
 		return vector.new(
 			self.x - o.x,
 			self.y - o.y,
 			self.z - o.z
 		)
 	end,
-	mul = function( self, m )
-		return location.new(
-			self.x * m,
-			self.y * m,
-			self.z * m,
-			self.h
-		)
+	left = function(self)
+		self.h = self.h - 1
+		if self.h < 1 then self.h = self.h + 4 end
+		return turtle.turnLeft()
 	end,
-	tostring = function( self )
+	right = function(self)
+		self.h = self.h + 1
+		if self.h > 4 then self.h = self.h - 4 end
+		return turtle.turnRight()
+	end,
+	forward = function(self)
+		if turtle then
+			if turtle.forward() then
+				self.x = self.x - (self.h - 2) * (self.h % 2)
+				self.z = self.z - (self.h - 3) * ((self.h + 1) % 2)
+				return true
+			end
+		end
+		return false
+	end,
+	back = function(self)
+		if turtle then
+			if turtle.back() then
+				self.x = self.x - (self.h - 2) * (self.h % 2)
+				self.z = self.z - (self.h - 3) * ((self.h + 1) % 2)
+				return true
+			end
+		end
+		return false
+	end,
+	up = function(self)
+		if turtle then
+			if turtle.up() then
+				self.y = self.y + 1
+				return true
+			end
+		end
+		return false
+	end,
+	down = function(self)
+		if turtle then
+			if turtle.down() then
+				self.y = self.y - 1
+				return true
+			end
+		end
+		return false
+	end,
+	moveDeltas = function(self)
+		return (self.h - 2) * (self.h % 2), (self.h - 3) * ((self.h + 1) % 2)
+	end,
+	setHeading = function(self, head)
+		while self.h ~= head do
+			if (self.h + 1) % 4 == head % 4 then
+				self:right()
+			else
+				self:left()
+			end
+		end
+	end,
+	tovector = function(self)
+		if vector then
+			return vector.new(
+				self.x,
+				self.y,
+				self.z
+			)
+		else
+			return nil
+		end
+	end,
+	tostring = function(self)
 		return self.x..","..self.y..","..self.z..","..self.h
 	end,
 }
@@ -46,26 +109,8 @@ function new( x, y, z, h )
 	return l
 end
 
-function left(orientation)
-	if turtle then turtle.turnLeft() end
-	orientation = orientation - 1
-	if orientation < 1 then orientation = orientation + 4 end
-	return orientation
-end
-
-function right(orientation)
-	if turtle then turtle.turnRight() end
-	orientation = orientation + 1
-	if orientation > 4 then orientation = orientation - 4 end
-	return orientation
-end
-
 function getOrientation(x, z)
 	return ((x + math.abs(x) * 2) + (z + math.abs(z) * 3))
-end
-
-function getMovements(loc)
-	return (loc.h - 2) * (loc.h % 2), (loc.h - 3) * ((loc.h + 1) % 2)
 end
 
 --[[
