@@ -81,33 +81,22 @@ local function loadNodeTable ()
 	return true
 end
 
-local function orient(loc, head)
-	while loc.h ~= head do
-		if loc.h > head and (loc.h ~= 4 and head ~= 1) then
-			loc:right(loc)
-		else
-			loc = location.left(loc)
-		end
-	end
-	return loc
-end
-
 local function orientAndHeight(loc, head)
-	loc = orient(loc, head)
+	loc:setHeading(head)
 	if loc.y ~= nodeTable.travel.pos and loc.h > 2 then
 		while loc.y ~= nodeTable.travel.pos do
 			if loc.y - nodeTabel.travel.pos < 0 then
-				if turtle.up() then loc.y = loc.y + 1 end
+				loc:up()
 			else
-				if turtle.down() then loc.y = loc.y - 1 end
+				loc:down()
 			end
 		end
 	elseif loc.y ~= nodeTable.travel.neg and loc.h < 3 then
 		while loc.y ~= nodeTable.travel.neg do
 			if loc.y - nodeTabel.travel.neg < 0 then
-				if turtle.up() then loc.y = loc.y + 1 end
+				loc:up()
 			else
-				if turtle.down() then loc.y = loc.y - 1 end
+				loc:down()
 			end
 		end
 	end
@@ -128,25 +117,17 @@ local function moveTo (moveLoc, loc)
 		orient = location.getOrientation(moveX, moveZ)
 		loc = orientAndHeight(loc, orient)
 		while magnitude > 0 do
-			if turtle.forward() then
-				loc.x = loc.x + moveX
-				loc.z = loc.z + moveZ
+			if loc:forward() then
 				magnitude = magnitude - 1
 			else
 				if loc.h % 2 == 0 then
-					turtle.turnLeft()
-					if turtle.forward() then
-						loc.x = loc.x + moveZ
-						loc.z = loc.z + moveX
-					end
-					turtle.turnRight()
+					loc:left()
+					loc:forward()
+					loc:right()
 				else
-					turtle.turnRight()
-					if turtle.forward() then
-						loc.x = loc.x + moveZ
-						loc.z = loc.z + moveX
-					end
-					turtle.turnLeft()
+					loc:right()
+					loc:forward()
+					loc:left()
 				end
 			end
 		end
@@ -154,16 +135,12 @@ local function moveTo (moveLoc, loc)
 	while loc.y ~= moveLoc.y do
 		deltaY = moveLoc.y - loc.y
 		if deltaY > 0 then
-			if turtle.up() then
-				loc.y = loc.y + 1
-			end
+			loc:up()
 		else
-			if turtle.down() then
-				loc.y = loc.y - 1
-			end
+			loc:down()
 		end
 	end
-	return orient(loc, moveLoc.h)
+	return loc:setHeading(moveLoc.h)
 end
 
 local function requestIdleNode()
