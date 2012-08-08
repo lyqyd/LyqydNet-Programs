@@ -177,9 +177,9 @@ newfs.move = function(source, dest)
 	if string.find(source, "^/?remote/") then
 		local serverConn = connection.open(string.match(source, "^/?remote/(%w+)/"), 21, 2)
 		if not serverConn then return nil end
+		if not fs.exists(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) then fs.makeDir(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) end
 		if not netfile.get(serverConn, string.match(source, "^/?remote/%w+/(.*)"), ".remote/"..string.match(source, "^/?remote/(.*)"), 2) then return nil end
 		connection.close(serverConn)
-		if not fs.exists(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) then fs.makeDir(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) end
 		source = ".remote/"..string.match(source, "^/?remote/(.*)")
 	end
 	if string.find(dest, "^/?remote/") then
@@ -207,9 +207,9 @@ newfs.copy = function(source, dest)
 	if string.find(source, "^/?remote/") then
 		local serverConn = connection.open(string.match(source, "^/?remote/(%w+)/"), 21, 2)
 		if not serverConn then return nil end
+		if not fs.exists(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) then fs.makeDir(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) end
 		if not netfile.get(serverConn, string.match(source, "^/?remote/%w+/(.*)"), ".remote/"..string.match(source, "^/?remote/(.*)"), 2) then return nil end
 		connection.close(serverConn)
-		if not fs.exists(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) then fs.makeDir(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) end
 		source = ".remote/"..string.match(source, "^/?remote/(.*)")
 	end
 	if string.find(dest, "^/?remote/") then
