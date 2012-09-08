@@ -20,6 +20,13 @@ local location = {
 			self.z * m
 		)
 	end,
+	div = function(self, d)
+		return vector.new(
+			self.x / d,
+			self.y / d,
+			self.z / d
+		)
+	end,
 	left = function(self)
 		self.h = self.h - 1
 		if self.h < 1 then self.h = self.h + 4 end
@@ -102,6 +109,7 @@ local vmetatable = {
 	__add = location.add,
 	__sub = location.sub,
 	__mul = location.mul,
+	__div = location.div,
 	__unm = function( l ) return l:mul(-1) end,
 	__tostring = location.tostring,
 }
