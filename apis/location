@@ -79,7 +79,7 @@ local location = {
 		return (self.h - 2) * (self.h % 2), (self.h - 3) * ((self.h + 1) % 2)
 	end,
 	setHeading = function(self, head)
-		if not head or head < 1 or head > 4 then return nil end
+		if not head or head < 1 or head > 4 then return nil, "Heading Not in Range" end
 		while self.h ~= head do
 			if (self.h + 1) % 4 == head % 4 then
 				self:right()
@@ -104,7 +104,7 @@ local location = {
 	end,
 }
 
-local vmetatable = {
+local lmetatable = {
 	__index = location,
 	__add = location.add,
 	__sub = location.sub,
@@ -121,7 +121,7 @@ function new( x, y, z, h )
 		z = z or 0,
 		h = h or 1
 	}
-	setmetatable( l, vmetatable )
+	setmetatable( l, lmetatable )
 	return l
 end
 
