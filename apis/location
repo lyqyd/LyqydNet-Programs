@@ -27,19 +27,19 @@ local location = {
 			self.z / d
 		)
 	end,
-	left = function(self)
+	left = function(self, noMove)
 		self.h = self.h - 1
 		if self.h < 1 then self.h = self.h + 4 end
-		return turtle.turnLeft()
+		return noMove or turtle.turnLeft()
 	end,
-	right = function(self)
+	right = function(self, noMove)
 		self.h = self.h + 1
 		if self.h > 4 then self.h = self.h - 4 end
-		return turtle.turnRight()
+		return noMove or turtle.turnRight()
 	end,
-	forward = function(self)
-		if turtle then
-			if turtle.forward() then
+	forward = function(self, noMove)
+		if noMove or turtle then
+			if noMove or turtle.forward() then
 				self.x = self.x + (self.h - 2) * (self.h % 2)
 				self.z = self.z + (self.h - 3) * ((self.h + 1) % 2)
 				return true
@@ -47,7 +47,7 @@ local location = {
 		end
 		return false
 	end,
-	back = function(self)
+	back = function(self, noMove)
 		if turtle then
 			if turtle.back() then
 				self.x = self.x - (self.h - 2) * (self.h % 2)
@@ -57,18 +57,18 @@ local location = {
 		end
 		return false
 	end,
-	up = function(self)
-		if turtle then
-			if turtle.up() then
+	up = function(self, noMove)
+		if noMove or turtle then
+			if noMove or turtle.up() then
 				self.y = self.y + 1
 				return true
 			end
 		end
 		return false
 	end,
-	down = function(self)
-		if turtle then
-			if turtle.down() then
+	down = function(self, noMove)
+		if noMove or turtle then
+			if noMove or turtle.down() then
 				self.y = self.y - 1
 				return true
 			end
@@ -101,6 +101,9 @@ local location = {
 	end,
 	tostring = function(self)
 		return self.x..","..self.y..","..self.z..","..self.h
+	end,
+	value = function(self)
+		return self.x, self.y, self.z, self.h
 	end,
 }
 
