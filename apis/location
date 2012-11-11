@@ -113,8 +113,8 @@ local lmetatable = {
 	__sub = location.sub,
 	__mul = location.mul,
 	__div = location.div,
-	__unm = function( l ) return l:mul(-1) end,
-	__tostring = location.tostring,
+	__unm = function(l) return l:mul(-1) end,
+	__tostring = function(l) return l:tostring() end,
 }
 
 function new( x, y, z, h )
