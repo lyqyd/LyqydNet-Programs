@@ -118,111 +118,117 @@ local function chatread( _sReplaceChar, _tHistory )
 				end
 			end
 		elseif sEvent == "rednet_message" then
+			local wX, wY = term.getCursorPos()
+			term.setCursorPos(pX, pY)
+			term.setCursorBlink(false)
 			routeNum, pType, packetData = net.rednet_message(param, param2, param3)
-			if routeNum then
-				if connection.route(serverConnection) == routeNum then
-					processResponse(pType, packetData)
-				end 
-			end
-
-			foo, sy = term.getCursorPos()
-			if shell.getRunningProgram() == nil then
-				term.setCursorPos(1, sy)
-				term.write(shell.dir().."> ")
-				term.setCursorPos(foo, sy)
-			end
+			pX, pY = term.getCursorPos()
+			term.setCursorPos(wX, wY)
+			term.setCursorBlink(true)
 			redraw()
 		end
 	end
 	
-	term.setCursorBlink( false )
-	term.setCursorPos( w + 1, sy )
-	print()
-	
+	term.setCursorBlink(false)
 	return sLine
 end
 
-local function processResponse(pType, message)
-	if pType == "SC" then
-		net.localprint("Connection closed by server.")
-		connection.close(serverConnection, "disconnect", true)
-	elseif pType == "SP" then
-		if string.sub(message, 1, 2) == "p;" then
-			message = string.match(message, ";(.*)")
-			if message ~= "\n" then net.localprint(message) end
-		elseif string.sub(message, 1, 2) == "c;" then
-			message = string.sub(message, 3)
-			local commandReceived = string.match(message, "^(%w+),?")
-			if commandReceived == "kicked" or commandReceived == "banned" or commandReceived == "disconnected" then
-				local userName = string.match(message, ",(%w+)")
-				for uNum, uInfo in ipairs(connectedUsers) do
-					if uInfo.name = userName then
-						table.remove(connectedUsers, uNum)
-						break
-					end
-				end
-				if commandReceived == "kicked" then
-					net.localprint("User "..userName.." was kicked.")
-				elseif commandReceived == "banned" then
-					net.localprint("User "..userName.." was banned.")
-				elseif commandReceived == "disconnected" then
-					net.localprint("User "..userName.." disconnceted.")
-				end
-			elseif commandReceived == "passwordUpdate" then
-				net.localprint("Password Updated!")
-			elseif commandReceived == "loginFailed" then
-				net.localprint("Login Failed!")
-			elseif commandReceived == "alreadyLoggedIn" then
-				net.localprint("Already logged in!")
-			elseif commandReceived == "nameTaken" then
-				net.localprint("User name "..string.match(message, ",(%w+)").." already taken!")
-			elseif commandReceived == "connected" then
-				local us = false
-				if lastCommand then
-					if string.match(tChatHistory[#tChatHistory], "/(%a+) ") == "login" or string.match(tChatHistory[#tChatHistory], "/(%a+) ") == "register" then
-						if string.match(tChatHistory[#tChatHistory], "/%a+ (%w+)") == string.match(message, ",(%w+),") then
-							net.localprint("Connected as "..string.match(message, ",(%w+),")..".")
-							us = true
+function processResponse(pType, message)
+	while true do
+		_, pType, message = coroutine.yield()
+		message = string.match(message, "%d+,%d+;(.*)")
+		if pType == "SC" then
+			print("Connection closed by server.")
+			connection.close(serverConnection, "disconnect", true)
+		elseif pType == "SP" then
+			if string.sub(message, 1, 2) == "p;" then
+				message = string.match(message, ";(.*)")
+				if message ~= "\n" then print(message) end
+			elseif string.sub(message, 1, 2) == "c;" then
+				message = string.sub(message, 3)
+				local commandReceived = string.match(message, "^(%w+),?")
+				if commandReceived == "kicked" or commandReceived == "banned" or commandReceived == "disconnected" then
+					local userName = string.match(message, ",(%w+)")
+					for uNum, uInfo in ipairs(connectedUsers) do
+						if uInfo.name == userName then
+							table.remove(connectedUsers, uNum)
+							break
 						end
 					end
-				end
-				if not us then
-					net.localprint("User "..string.match(message, ",(%w+),").." connected.")
-				end
-				local user = {}
-				user.name = string.match(message, ",(%w+),")
-				user.mode = string.match(message, ",(%w+)$")
-				table.insert(connectedUsers, user)
-			elseif commandReceived == "mode" then
-				local userName = string.match(message, ",(%w+),")
-				for uNum, uInfo in ipairs(connectedUsers) do
-					if uInfo.name == userName then
-						uInfo.mode = string.match(message, ",(%w+)$")
-						break
+					if commandReceived == "kicked" then
+						print("User "..userName.." was kicked.")
+					elseif commandReceived == "banned" then
+						print("User "..userName.." was banned.")
+					elseif commandReceived == "disconnected" then
+						print("User "..userName.." disconnceted.")
 					end
-				end
-			elseif commandReceived == "usersOnline" then
-				userString = string.match(message, "usersOnline,(.*)")
-				for uName, uMode in string.gmatch(userString, "(%w+),(%w+);")
+				elseif commandReceived == "passwordUpdate" then
+					print("Password Updated!")
+				elseif commandReceived == "loginFailed" then
+					print("Login Failed!")
+				elseif commandReceived == "alreadyLoggedIn" then
+					print("Already logged in!")
+				elseif commandReceived == "nameTaken" then
+					print("User name "..string.match(message, ",(%w+)").." already taken!")
+				elseif commandReceived == "connected" then
+					local us = false
+					if lastCommand then
+						if string.match(tChatHistory[#tChatHistory], "/(%a+) ") == "login" or string.match(tChatHistory[#tChatHistory], "/(%a+) ") == "register" then
+							if string.match(tChatHistory[#tChatHistory], "/%a+ (%w+)") == string.match(message, ",(%w+),") then
+								print("Connected as "..string.match(message, ",(%w+),")..".")
+								us = true
+							end
+						end
+					end
+					if not us then
+						print("User "..string.match(message, ",(%w+),").." connected.")
+					end
 					local user = {}
-					user.name = uName
-					user.mode = uMode
+					user.name = string.match(message, ",(%w+),")
+					user.mode = string.match(message, ",(%w+)$")
 					table.insert(connectedUsers, user)
+				elseif commandReceived == "mode" then
+					local userName = string.match(message, ",(%w+),")
+					for uNum, uInfo in ipairs(connectedUsers) do
+						if uInfo.name == userName then
+							uInfo.mode = string.match(message, ",(%w+)$")
+							break
+						end
+					end
+				elseif commandReceived == "usersOnline" then
+					userString = string.match(message, "usersOnline,(.*)")
+					for uName, uMode in string.gmatch(userString, "(%w+),(%w+);") do
+						local user = {}
+						user.name = uName
+						user.mode = uMode
+						table.insert(connectedUsers, user)
+					end
 				end
 			end
 		end
 	end
 end
 
+pX, pY = 1, 1
 local tChatHistory = {}
 local serverConnection = false
 local lastCommand = false
 if tArgs[1] then
 	serverConnection = connection.open(tArgs[1], 18, 2)
-	if not serverConnection then print("Connection Failed!") else print("Connected to "..tArgs[1]..".") end
+	if not serverConnection then
+		print("Connection Failed!")
+	else
+		print("Connected to "..tArgs[1]..".")
+		net.daemonAdd("chatPrint", processResponse, connection.connectionTable[serverConnection].localport)
+	end
 end
+term.clear()
+local x, y = term.getSize()
+term.setCursorPos(1, y)
 while true do
-	if serverConnection then write(.."> ") else write("chatc: ") end
+	term.setCursorPos(1, y)
+	term.clearLine()
+	if serverConnection then write("> ") else write("chatc: ") end
 	local sLine = chatread(nil, tChatHistory)
 	lastCommand = false
 	table.insert( tChatHistory, sLine )
