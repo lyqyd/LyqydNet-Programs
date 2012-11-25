@@ -37,7 +37,7 @@ end
 
 newfs.exists = function(path)
 	if string.find(path, "^/?remote/") then
-		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)"), 21, 2)
 		if not serverConn then return false end
 		connection.send(serverConn, "fileStatus", string.match(path, "^/?remote/%w+/(.*)"))
 		local dataRcvd = false
@@ -64,8 +64,8 @@ end
 
 newfs.isDir = function(path)
 	if string.find(path, "^/?remote/") then
-		if string.find(path, "^/?remote/%w+/?(%w+)") == nil then
-			local serverConn = connection.open(string.match(path,  "^/?remote/(%w+)/"), 21, 2)
+		if string.find(path, "^/?remote/%w+/(%w+)") == nil then
+			local serverConn = connection.open(string.match(path,  "^/?remote/(%w+)"), 21, 2)
 			if serverConn then
 				connection.close(serverConn)
 				return true
@@ -73,7 +73,7 @@ newfs.isDir = function(path)
 				return false
 			end
 		else
-			local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+			local serverConn = connection.open(string.match(path, "^/?remote/(%w+)"), 21, 2)
 			if not serverConn then return false end
 			connection.send(serverConn, "fileStatus", string.match(path, "^/?remote/%w+/(.*)"))
 			local dataRcvd = false
@@ -101,7 +101,7 @@ end
 
 newfs.isReadOnly = function(path)
 	if string.find(path, "^/?remote/") then
-		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)"), 21, 2)
 		if not serverConn then return false end
 		connection.send(serverConn, "fileStatus", string.match(path, "^/?remote/%w+/(.*)"))
 		local dataRcvd = false
@@ -144,7 +144,7 @@ end
 
 newfs.getSize = function(path)
 	if string.find(path, "^/?remote/") then
-		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)"), 21, 2)
 		if not serverConn then return nil end
 		connection.send(serverConn, "fileStatus", string.match(path, "^/?remote/%w+/(.*)"))
 		local messType, message = connection.awaitResponse(serverConn, 2)
@@ -163,7 +163,7 @@ newfs.makeDir = function(path)
 	if string.find(path, "^/?remote/") then
 		local dirPath = string.match(path, "^/?remote/%w+/(.*)")
 		if not dirPath then return nil end
-		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+		local serverConn = connection.open(string.match(path, "^/?remote/(%w+)"), 21, 2)
 		if not serverConn then return nil end
 		connection.send(serverConn, "fileMakeDirectory", dirPath)
 		connection.close(serverConn)
@@ -175,7 +175,7 @@ end
 
 newfs.move = function(source, dest)
 	if string.find(source, "^/?remote/") then
-		local serverConn = connection.open(string.match(source, "^/?remote/(%w+)/"), 21, 2)
+		local serverConn = connection.open(string.match(source, "^/?remote/(%w+)"), 21, 2)
 		if not serverConn then return nil end
 		if not fs.exists(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) then fs.makeDir(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) end
 		if not netfile.get(serverConn, string.match(source, "^/?remote/%w+/(.*)"), ".remote/"..string.match(source, "^/?remote/(.*)"), 2) then return nil end
@@ -205,7 +205,7 @@ end
 
 newfs.copy = function(source, dest)
 	if string.find(source, "^/?remote/") then
-		local serverConn = connection.open(string.match(source, "^/?remote/(%w+)/"), 21, 2)
+		local serverConn = connection.open(string.match(source, "^/?remote/(%w+)"), 21, 2)
 		if not serverConn then return nil end
 		if not fs.exists(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) then fs.makeDir(".remote/"..string.match(source, "^/?remote/(.*)/%w+$")) end
 		if not netfile.get(serverConn, string.match(source, "^/?remote/%w+/(.*)"), ".remote/"..string.match(source, "^/?remote/(.*)"), 2) then return nil end
@@ -239,7 +239,7 @@ newOpen = function (path, _mode )
 		return oldioOpen(path, _mode)
 	end
 	isRemote = true
-	local serverConn = connection.open(string.match(path, "^/?remote/(%w+)/"), 21, 2)
+	local serverConn = connection.open(string.match(path, "^/?remote/(%w+)"), 21, 2)
 	if not serverConn then return nil end
 	if not fs.exists(".remote/"..string.match(path, "^/?remote/(.*)/%w+$")) then fs.makeDir(".remote/"..string.match(path, "^/?remote/(.*)/%w+$")) end
 	if not netfile.get(serverConn, string.match(path, "^/?remote/%w+/(.*)"), ".remote/"..string.match(path, "^/?remote/(.*)"), 2) then return nil end
