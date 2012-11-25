@@ -1,77 +1,13 @@
 local connections = {}
 
-local function exLua (string)
-	local nForcePrint = 0
-	local func, e = loadstring( string, "lua" )
-	local func2, e2 = loadstring( "return "..string, "lua" )
-	if not func then
-		if func2 then
-			func = func2
-			e = nil
-			nForcePrint = 1
-		end
-	else
-		if func2 then
-			func = func2
-		end
-	end
-
-	local tEnv = {}
-	setmetatable( tEnv, { __index = getfenv() } )
-	
-	if func then
-        setfenv( func, tEnv )
-        local tResults = { pcall( function() return func() end ) }
-        if tResults[1] then
-        	local n = 1
-        	while (tResults[n + 1] ~= nil) or (n <= nForcePrint) do
-        		print( tostring( tResults[n + 1] ) )
-        		n = n + 1
-        	end
-        else
-        	print( tResults[2] )
-        end
-    else
-    	print( e )
-    end
-end
-
-local function exShell (string)
-	local tWords = {}
-	for match in string.gmatch(string, "[^ \t]+") do
-		table.insert( tWords, match )
-	end
-
-	local sCommand = tWords[1]
-	if sCommand then
-		if shell.resolveProgram(sCommand) == "rom/programs/cd" then
-			if #tWords < 2 then
-				print( "Usage: cd <path>" )
-			else
-				local localDir = shell.dir()
-				shell.setDir (connections[conn].netDir)
-				local sNewDir = shell.resolve( tWords[2] )
-				if fs.isDir( sNewDir ) then
-					connections[conn].netDir = sNewDir
-				else
-					print( "Not a directory" )
-				end
-				shell.setDir (localDir)
-			end
-		elseif shell.resolveProgram(sCommand) == "rom/programs/edit" then
-			localFile = shell.resolve(tWords[2])
-			netfile.send(conn, localFile)
-			netfile.receive(conn, localFile)
-		else
-			local localDir = shell.dir()
-			shell.setDir (connections[conn].netDir)
-			shell.run( sCommand, unpack( tWords, 2 ) )
-			shell.setDir (localDir)
-		end
-	end
+local function newSession()
+	local sessionThread = coroutine.create(function() shell.run("/rom/programs/shell") end)
+	return sessionThread
 end
 
 nshdExit = false
+
+mon = peripheral.wrap("top")
 
 --initialization
 while not nshdExit do
@@ -80,39 +16,48 @@ while not nshdExit do
 		--daemon command logic
 	else
 		if connections[conn] and connections[conn].status == "open" then
-			if packetType == "data" then
-				--if not daemonMode then print("Remote Command: "..message) end
-				print("Remote Command: "..message)
-				term.redirect(connection.text(conn))
-				if message == "lua" and not connections[conn].mode then
-					connections[conn].mode = "lua"
-					connections[conn].holdDir = connections[conn].netDir
-					connections[conn].netDir = "lua"
-				elseif connections[conn].mode and connections[conn].mode == "lua" then
-					if message == "exit()" then
-						connections[conn].mode = nil
-						connections[conn].netDir = connections[conn].holdDir
-					else
-						exLua(message)
+			if packetType == "data" or string.sub(packetType, 1, 4) == "text" then
+				local eventTable = {}
+				if packetType == "data" then
+					for match, typeCode in string.gmatch(message, "(.-);([^;])") do
+						if typeCode == "n" then
+							table.insert(eventTable, tonumber(match))
+						elseif typeCode == "b" then
+							if match == "true" then
+								table.insert(eventTable, true)
+							else
+								table.insert(eventTable, false)
+							end
+						else
+							table.insert(eventTable, match)
+						end
 					end
 				else
-					if message == "reboot" or message == "exit" or message == "shutdown" then
-						for cNum, cInfo in pairs(connections) do
-							connection.send(cNum, "close", "end")
-						end
-						term.restore()
-					end
-					exShell(message)
+					table.insert(eventTable, "socket_message")
+					table.insert(eventTable, connection.connectionTable[conn].localport)
+					table.insert(eventTable, net.CIDFromRoute(connection.connectionTable[conn].route))
+					table.insert(eventTable, connection.pTypeLookup[packetType]..":"..connection.connectionTable[conn].localport..","..connection.connectionTable[conn].foreignport..";"..message)
+				end
+				term.redirect(connections[conn].target)
+				--term.redirect(mon)
+				coroutine.resume(connections[conn].thread, unpack(eventTable))
+				if coroutine.status(connections[conn].thread) == "dead" then
+					if not daemonMode then print("Client disconnected: "..connection.name(conn)) end
+					connection.close(conn)
+					table.remove(connections, conn)
 				end
 				term.restore()
-				if connections[conn].netDir == "" then connections[conn].netDir = "/" end
-				connection.send(conn, "done", connections[conn].netDir)
 			elseif packetType == "query" then
 				--reset connection
 				connections[conn].status = "open"
 				connections[conn].mode = nil
-				connections[conn].netDir = "/"
+				connections[conn].target = connection.text(conn)
+				connections[conn].thread = newSession()
 				connection.send(conn, "response", "/")
+				term.redirect(connections[conn].target)
+				--term.redirect(mon)
+				coroutine.resume(connections[conn].thread)
+				term.restore()
 				if not daemonMode then print("Client reconnected: "..connection.name(conn)) end
 			elseif packetType == "close" then
 				table.remove(connections, conn)
@@ -129,9 +74,14 @@ while not nshdExit do
 			local connInfo = {}
 			connInfo.status = "open"
 			connInfo.mode = nil
-			connInfo.netDir = "/"
-			table.insert(connections, conn, connInfo)
+			connInfo.target = connection.text(conn)
+			connInfo.thread = newSession()
 			connection.send(conn, "response", "/")
+			table.insert(connections, conn, connInfo)
+			term.redirect(connInfo.target)
+			--term.redirect(mon)
+			coroutine.resume(connInfo.thread)
+			term.restore()
 			if not daemonMode then print("Client connected: "..connection.name(conn)) end
 		end
 	end
