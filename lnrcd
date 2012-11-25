@@ -7,7 +7,7 @@ function sendPacket(message, exclude)
 	if type(message) == "string" then
 		for uNum, uInfo in pairs(userTable) do
 			if not exclude or uInfo.conn ~= exclude then
-				if uInfo.conn and connections[uInfo.conn] then connection.send(uInfo.conn, message) end
+				if uInfo.conn and connections[uInfo.conn] then connection.send(uInfo.conn, "data", message) end
 			end
 		end
 		return true
@@ -25,8 +25,8 @@ function sendMessage(message, exclude)
 end
 
 function sendCommand(comString, exclude)
-	if type(message) == "string" then
-		return sendPacket("c;"..message, exclude)
+	if type(comString) == "string" then
+		return sendPacket("c;"..comString, exclude)
 	else
 		return false
 	end
@@ -84,7 +84,7 @@ while true do
 				--is a command
 				local command = string.match(message, "/(%a+) ")
 				local commandArgs = {}
-				local comString = string.match(mesage, "/%a+ (.*)")
+				local comString = string.match(message, "/%a+ (.*)")
 				for match in string.gmatch(comString, "[^ \t]+") do
 					table.insert( commandArgs, match )
 				end
@@ -158,17 +158,17 @@ while true do
 					end
 					if not taken then
 						newUser = {}
-						newUser.name = string.match(commandArgs[1], "^(%w)")
+						newUser.name = string.match(commandArgs[1], "^(%w+)")
 						newUser.pass = commandArgs[2]
 						newUser.conn = conn
 						newUser.mode = ""
 						table.insert(userTable, newUser)
-						sendCommand("connected,"..string.match(commandArgs[1], "^(%w)"))
+						sendCommand("connected,"..string.match(commandArgs[1], "^(%w+)"))
 						writeConfig()
 					else
 						local sameConn = false
 						for uNum, uInfo in ipairs(userTable) do
-							if uInfo.name and uInfo.name = commandArgs[1] then
+							if uInfo.name and uInfo.name == commandArgs[1] then
 								if uInfo.conn and uInfo.conn == conn then
 									sameConn = true
 									uInfo.pass = commandArgs[2]
@@ -201,13 +201,15 @@ while true do
 							if uInfo.name == commandArgs[1] then
 								if uInfo.pass == commandArgs[2] then
 									uInfo.conn = conn
-									sendMessage("c;connected,"..commandArgs[1])
+									sendCommand("connected,"..commandArgs[1])
 								else
 									connection.send(conn, "data", "c;loginFailed")
 								break
+								end
 							end
 						end
 					end
+				end
 			else
 				--This is regular chat.
 				local send = false
@@ -261,10 +263,10 @@ while true do
 		end
 		if not banned then
 			if connections[conn] then
-				connections[conn].status = open
+				connections[conn].status = "open"
 			else
 				local connect = {}
-				connect.status = open
+				connect.status = "open"
 				connect.name = connection.name(conn)
 				table.insert(connections, conn, connect)
 			end
@@ -275,7 +277,7 @@ while true do
 					userstring = userstring..uInfo.name..","..uInfo.mode..";"
 				end
 			end
-			connection.send(conn, "data" "c;usersOnline,"..userstring)
+			connection.send(conn, "data", "c;usersOnline,"..userstring)
 		end
 	end
 end
