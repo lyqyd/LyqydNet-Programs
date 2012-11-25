@@ -66,14 +66,17 @@ function fileDaemon ()
 			elseif messType == "fileStatus" then
 				local path = shell.resolve(message)
 				local exists = fs.exists(path)
-				local isDir = fs.isDir(path)
-				local readOnly = fs.isReadOnly(path)
-				local size = fs.getSize(path)
+				if exists then
+					local isDir = fs.isDir(path)
+					local readOnly = fs.isReadOnly(path)
+					local size = fs.getSize(path)
+				end
 				local string = ""
 				if exists then string = string.."e;" end
 				if isDir then string = string.."d;" end
 				if readOnly then string = string.."r;" end
 				if size then string = string.."s;"..size end
+				if string == "" then string = "n;" end
 				connection.send(conn, "fileInformation", string)
 			elseif messType == "fileCopy" or messType == "fileMove" then
 				source, dest = string.match(message, "(%w+) (%w+)")
