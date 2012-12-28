@@ -56,12 +56,7 @@ elseif tArgs[1] == "shell" and #tArgs == 2 then
 				end
 			end
 		elseif event[1] == "mouse_click" or event[1] == "mouse_drag" or event[1] == "mouse_scroll" or event[1] == "key" or event[1] == "char" then
-			--pack up event
-			local eventString = ""
-			for i=1, #event do
-				eventString = eventString..tostring(event[i])..";"..string.sub(type(event[i]), 1, 1)
-			end
-			connection.send(serverConnection, "data", eventString)
+			connection.send(serverConnection, "event", textutils.serialize(event))
 		end
 	end
 

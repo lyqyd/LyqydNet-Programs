@@ -16,24 +16,12 @@ while not nshdExit do
 		--daemon command logic
 	else
 		if connections[conn] and connections[conn].status == "open" then
-			if packetType == "data" or string.sub(packetType, 1, 4) == "text" then
+			if packetType == "event" or string.sub(packetType, 1, 4) == "text" then
 				local eventTable = {}
-				if packetType == "data" then
-					for match, typeCode in string.gmatch(message, "(.-);([^;])") do
-						if typeCode == "n" then
-							table.insert(eventTable, tonumber(match))
-						elseif typeCode == "b" then
-							if match == "true" then
-								table.insert(eventTable, true)
-							else
-								table.insert(eventTable, false)
-							end
-						else
-							table.insert(eventTable, match)
-						end
-					end
+				if packetType == "event" then
+					eventTable = textutils.unserialize(message)
 				else
-					table.insert(eventTable, "socket_message")
+					table.insert(eventTable, "socket_inbound")
 					table.insert(eventTable, connection.connectionTable[conn].localport)
 					table.insert(eventTable, net.CIDFromRoute(connection.connectionTable[conn].route))
 					table.insert(eventTable, connection.pTypeLookup[packetType]..":"..connection.connectionTable[conn].localport..","..connection.connectionTable[conn].foreignport..";"..message)
