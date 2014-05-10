@@ -1,4 +1,4 @@
-local location = {
+local Location = {
 	add = function(self, o)
 		return vector.new(
 			self.x + o.x,
@@ -108,11 +108,11 @@ local location = {
 }
 
 local lmetatable = {
-	__index = location,
-	__add = location.add,
-	__sub = location.sub,
-	__mul = location.mul,
-	__div = location.div,
+	__index = Location,
+	__add = Location.add,
+	__sub = Location.sub,
+	__mul = Location.mul,
+	__div = Location.div,
 	__unm = function(l) return l:mul(-1) end,
 	__tostring = function(l) return l:tostring() end,
 }
